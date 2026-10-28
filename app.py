@@ -31,10 +31,18 @@ def make_oauth():
 
 
 def get_client():
-    """Spotify client for the logged-in user, or None. Tokens live in the user's own session."""
-    if not FlaskSessionCacheHandler(session).get_cached_token():
+    """Spotify client for the logged-in user, or None.
+
+    The token is read (and refreshed if needed) here, in the request thread, then handed to
+    the client as a plain string so worker threads never need Flask's session.
+    """
+    token_info = FlaskSessionCacheHandler(session).get_cached_token()
+    if not token_info:
         return None
-    return spotipy.Spotify(auth_manager=make_oauth(), retries=5, status_retries=5, backoff_factor=0.5)
+    token_info = make_oauth().validate_token(token_info)  # refreshes and re-saves if expired
+    if not token_info:
+        return None
+    return spotipy.Spotify(auth=token_info["access_token"], retries=5, status_retries=5, backoff_factor=0.5)
 
 
 @app.get("/")
