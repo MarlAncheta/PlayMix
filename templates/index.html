@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hit Shuffle: playlists from an artist's biggest songs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #e8edf6; --surface: #f7f9fd; --ink: #101a33; --muted: #55627f;
+    --line: #c3cce0; --accent: #2340f5; --on-accent: #fff; --sun: #ffd43b; --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0f1424; --surface: #182039; --ink: #e9eeff; --muted: #9aa6c8;
+      --line: #2c3658; --accent: #8ba0ff; --on-accent: #0f1424; --danger: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 1.0625rem/1.5 "Bricolage Grotesque", system-ui, sans-serif;
+  }
+  main { max-width: 34rem; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  h1 { font-size: clamp(2.5rem, 9vw, 3.75rem); line-height: 1; letter-spacing: -0.03em; font-weight: 800; margin: 0 0 .75rem; }
+  .lede { color: var(--muted); margin: 0 0 2rem; max-width: 30rem; }
+  .who { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); margin-bottom: 2rem; }
+  .who a { color: inherit; }
+  label, .label { display: block; font-weight: 600; margin-bottom: .4rem; }
+  input[type=text] {
+    width: 100%; padding: .8rem 1rem; font: inherit; color: var(--ink);
+    background: var(--surface); border: 2px solid var(--line); border-radius: 10px;
+  }
+  input[type=text]:focus-visible, button:focus-visible, a:focus-visible, input[type=range]:focus-visible, input[type=checkbox]:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+  #results { list-style: none; margin: .5rem 0 0; padding: 0; }
+  #results button {
+    display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left;
+    padding: .55rem .75rem; font: inherit; color: inherit; background: transparent;
+    border: 0; border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  #results button:hover { background: var(--surface); }
+  #results img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--line); }
+  #results .empty { color: var(--muted); padding: .55rem .75rem; }
+  #picked { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-bottom: 3px solid var(--sun); padding-bottom: .4rem; }
+  #picked strong { font-size: 1.75rem; letter-spacing: -0.02em; }
+  .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .count { margin: 2.25rem 0 1.5rem; }
+  .count output { display: block; font-size: clamp(5rem, 24vw, 7.5rem); line-height: .9; font-weight: 800; letter-spacing: -0.05em; color: var(--accent); }
+  .count output small { font-size: 1.1rem; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-left: .5rem; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin-top: .75rem; }
+  .opt { display: flex; gap: .6rem; align-items: center; margin: .5rem 0; font-weight: 400; }
+  .opt input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+  .btn {
+    display: inline-block; margin-top: 1.5rem; padding: .95rem 1.6rem;
+    font-family: inherit; font-size: 1.05rem; font-weight: 600; color: var(--on-accent); background: var(--accent);
+    border: 0; border-radius: 999px; cursor: pointer; text-decoration: none;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  #status { margin-top: 1.25rem; min-height: 1.5rem; }
+  #status.error { color: var(--danger); }
+  #status a { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hit Shuffle</h1>
+  <p class="lede">Choose an artist and how many songs you want. We pick that many of their biggest hits at random and save them as a playlist in your Spotify account.</p>
+
+  {% if not logged_in %}
+    <a class="btn" href="/login">Connect Spotify</a>
+  {% else %}
+    <div class="who"><span>Signed in as {{ user_name }}</span><a href="/logout">Log out</a></div>
+
+    <div id="finder">
+      <label for="artist">Artist</label>
+      <input id="artist" type="text" autocomplete="off" placeholder="Search for an artist">
+      <ul id="results"></ul>
+    </div>
+
+    <div id="picked" hidden>
+      <strong id="picked-name"></strong>
+      <button type="button" class="link-btn" id="change">Change artist</button>
+    </div>
+
+    <div class="count">
+      <label for="count">Number of songs</label>
+      <output for="count" id="count-num">20<small>songs</small></output>
+      <input id="count" type="range" min="1" max="100" value="20">
+    </div>
+
+    <label class="opt"><input type="checkbox" id="clean" checked> Skip live, remix and demo versions</label>
+    <label class="opt"><input type="checkbox" id="public"> Make the playlist public</label>
+
+    <button class="btn" id="make" disabled>Create playlist</button>
+    <div id="status" role="status" aria-live="polite"></div>
+  {% endif %}
+</main>
+
+{% if logged_in %}
+<script>
+  const $ = (s) => document.querySelector(s);
+  const input = $('#artist'), results = $('#results'), make = $('#make'), status = $('#status');
+  let picked = null, timer = null;
+
+  function setStatus(text, isError = false, link = null) {
+    status.className = isError ? 'error' : '';
+    status.textContent = text;
+    if (link) {
+      status.append(' ');
+      const a = document.createElement('a');
+      a.href = link.href; a.textContent = link.label;
+      if (link.external) { a.target = '_blank'; a.rel = 'noopener'; }
+      status.append(a);
+    }
+  }
+  const needLogin = () => setStatus('Your Spotify session expired.', true, { href: '/login', label: 'Log in again' });
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { results.innerHTML = ''; return; }
+    timer = setTimeout(() => search(q), 250);
+  });
+
+  async function search(q) {
+    const res = await fetch('/api/artists?q=' + encodeURIComponent(q));
+    if (res.status === 401) return needLogin();
+    const data = await res.json();
+    if (!res.ok) return setStatus(data.error, true);
+    render(data.artists);
+  }
+
+  function render(artists) {
+    results.innerHTML = '';
+    if (!artists.length) {
+      const li = document.createElement('li');
+      li.className = 'empty'; li.textContent = 'No artists found. Check the spelling.';
+      results.append(li); return;
+    }
+    for (const a of artists) {
+      const li = document.createElement('li'), b = document.createElement('button');
+      b.type = 'button';
+      if (a.image) { const img = new Image(); img.src = a.image; img.alt = ''; b.append(img); }
+      const name = document.createElement('span'); name.textContent = a.name; b.append(name);
+      b.addEventListener('click', () => pick(a));
+      li.append(b); results.append(li);
+    }
+  }
+
+  function pick(a) {
+    picked = a;
+    $('#picked-name').textContent = a.name;
+    $('#finder').hidden = true; $('#picked').hidden = false;
+    results.innerHTML = ''; input.value = ''; make.disabled = false;
+  }
+
+  $('#change').addEventListener('click', () => {
+    picked = null; make.disabled = true;
+    $('#picked').hidden = true; $('#finder').hidden = false; input.focus();
+  });
+
+  $('#count').addEventListener('input', (e) => {
+    $('#count-num').firstChild.textContent = e.target.value;
+  });
+
+  make.addEventListener('click', async () => {
+    make.disabled = true;
+    setStatus('Building your playlist...');
+    try {
+      const res = await fetch('/api/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist_id: picked.id, artist_name: picked.name, count: +$('#count').value,
+          exclude_variants: $('#clean').checked, public: $('#public').checked,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 401) return needLogin();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+      const short = data.added < data.requested ? ` Only ${data.added} of ${data.requested} songs were available.` : '';
+      setStatus(`Playlist created with ${data.added} songs.${short}`, false,
+        { href: data.url, label: 'Open in Spotify', external: true });
+    } catch (e) {
+      setStatus(e.message, true);
+    } finally {
+      make.disabled = !picked;
+    }
+  });
+</script>
+{% endif %}
+</body>
+</html>
