@@ -39,3 +39,20 @@ def test_playlist_happy_path(client, monkeypatch):
     monkeypatch.setattr(app_module.pl, "create_playlist", lambda *a, **k: "https://open.spotify.com/playlist/x")
     res = client.post("/api/playlist", json={"artist_id": "a", "artist_name": "A", "count": 5})
     assert res.get_json() == {"url": "https://open.spotify.com/playlist/x", "added": 2, "requested": 5}
+
+
+def test_client_works_outside_request_context(monkeypatch):
+    """Regression: playlist lookups run in worker threads, which have no Flask session."""
+    import time
+    from flask import session
+
+    for name, value in [("ID", "id"), ("SECRET", "secret"), ("REDIRECT_URI", "http://127.0.0.1:5000/callback")]:
+        monkeypatch.setenv(f"SPOTIPY_CLIENT_{name}" if name != "REDIRECT_URI" else "SPOTIPY_REDIRECT_URI", value)
+    with app_module.app.test_request_context("/"):
+        session["token_info"] = {
+            "access_token": "abc", "refresh_token": "r", "token_type": "Bearer",
+            "expires_in": 3600, "expires_at": int(time.time()) + 3600, "scope": app_module.SCOPE,
+        }
+        sp = app_module.get_client()
+    assert sp is not None
+    assert sp._auth_headers() == {"Authorization": "Bearer abc"}  # no request context here
