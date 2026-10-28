@@ -165,14 +165,16 @@ def build_playlist(sp, artist, count, lastfm_key=None, exclude_variants=True,
 
 
 def create_playlist(sp, artist_name, uris, public=False):
-    user_id = sp.current_user()["id"]
-    playlist = sp.user_playlist_create(
-        user_id,
-        f"{artist_name} - Random Hits",
-        public=public,
-        description=f"{len(uris)} randomly picked hits by {artist_name}",
+    # Spotify removed POST /users/{id}/playlists in 2026; playlists are now created under /me
+    playlist = sp._post(
+        "me/playlists",
+        payload={
+            "name": f"{artist_name} - Random Hits",
+            "public": public,
+            "description": f"{len(uris)} randomly picked hits by {artist_name}",
+        },
     )
     for i in range(0, len(uris), 100):  # Spotify accepts at most 100 tracks per request
-        # Spotify renamed this endpoint from /tracks to /items in 2026
+        # Spotify also renamed /tracks to /items in 2026
         sp._post(f"playlists/{playlist['id']}/items", payload={"uris": uris[i:i + 100]})
     return playlist["external_urls"]["spotify"]
