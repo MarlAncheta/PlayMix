@@ -1,0 +1,7 @@
+flask>=3.0
+spotipy>=2.24
+requests>=2.31
+python-dotenv>=1.0
+gunicorn>=22.0
+flask-limiter>=3.5
+cryptography>=42.0
