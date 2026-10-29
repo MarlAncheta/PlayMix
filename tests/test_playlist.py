@@ -96,3 +96,20 @@ def test_resolved_uris_are_cached():
     pl.resolve_uri(sp, "Song", ARTIST)
     pl.resolve_uri(sp, "Song", ARTIST)
     assert len(calls) == 1
+
+
+def test_create_playlist_uses_2026_endpoints():
+    calls = []
+
+    class Recorder:
+        def _post(self, url, payload=None):
+            calls.append((url, payload))
+            return {"id": "p1", "external_urls": {"spotify": "https://open.spotify.com/playlist/p1"}}
+
+    uris = [f"spotify:track:{i}" for i in range(150)]
+    link = pl.create_playlist(Recorder(), "Test Artist", uris, public=True)
+
+    assert link == "https://open.spotify.com/playlist/p1"
+    assert calls[0][0] == "me/playlists" and calls[0][1]["public"] is True
+    assert [c[0] for c in calls[1:]] == ["playlists/p1/items", "playlists/p1/items"]
+    assert [len(c[1]["uris"]) for c in calls[1:]] == [100, 50]  # batched at 100

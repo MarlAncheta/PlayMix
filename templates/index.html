@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hit Shuffle: playlists from an artist's biggest songs</title>
+<title>PlayMix: playlists from an artist's biggest songs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
-<style>
+<style nonce="{{ csp_nonce }}">
   :root {
     --paper: #e8edf6; --surface: #f7f9fd; --ink: #101a33; --muted: #55627f;
     --line: #c3cce0; --accent: #2340f5; --on-accent: #fff; --sun: #ffd43b; --danger: #b3261e;
@@ -27,7 +27,8 @@
   h1 { font-size: clamp(2.5rem, 9vw, 3.75rem); line-height: 1; letter-spacing: -0.03em; font-weight: 800; margin: 0 0 .75rem; }
   .lede { color: var(--muted); margin: 0 0 2rem; max-width: 30rem; }
   .who { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); margin-bottom: 2rem; }
-  .who a { color: inherit; }
+  .who form { margin: 0; }
+  .who .link-btn { color: inherit; font-size: inherit; }
   label, .label { display: block; font-weight: 600; margin-bottom: .4rem; }
   input[type=text] {
     width: 100%; padding: .8rem 1rem; font: inherit; color: var(--ink);
@@ -67,13 +68,13 @@
 </head>
 <body>
 <main>
-  <h1>Hit Shuffle</h1>
+  <h1>PlayMix</h1>
   <p class="lede">Choose an artist and how many songs you want. We pick that many of their biggest hits at random and save them as a playlist in your Spotify account.</p>
 
   {% if not logged_in %}
     <a class="btn" href="/login">Connect Spotify</a>
   {% else %}
-    <div class="who"><span>Signed in as {{ user_name }}</span><a href="/logout">Log out</a></div>
+    <div class="who"><span>Signed in as {{ user_name }}</span><form method="post" action="/logout"><button type="submit" class="link-btn">Log out</button></form></div>
 
     <div id="finder">
       <label for="artist">Artist</label>
@@ -101,7 +102,7 @@
 </main>
 
 {% if logged_in %}
-<script>
+<script nonce="{{ csp_nonce }}">
   const $ = (s) => document.querySelector(s);
   const input = $('#artist'), results = $('#results'), make = $('#make'), status = $('#status');
   let picked = null, timer = null;
@@ -129,8 +130,8 @@
   async function search(q) {
     const res = await fetch('/api/artists?q=' + encodeURIComponent(q));
     if (res.status === 401) return needLogin();
-    const data = await res.json();
-    if (!res.ok) return setStatus(data.error, true);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setStatus(data.error || 'Search failed. Try again.', true);
     render(data.artists);
   }
 
@@ -175,11 +176,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          artist_id: picked.id, artist_name: picked.name, count: +$('#count').value,
+          artist_id: picked.id, count: +$('#count').value,
           exclude_variants: $('#clean').checked, public: $('#public').checked,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.status === 401) return needLogin();
       if (!res.ok) throw new Error(data.error || 'Something went wrong. Try again.');
       const short = data.added < data.requested ? ` Only ${data.added} of ${data.requested} songs were available.` : '';

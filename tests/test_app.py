@@ -1,12 +1,13 @@
-import pytest
+import time
 
 import app as app_module
 
+VALID_ID = "a" * 22
 
-@pytest.fixture
-def client():
-    app_module.app.config["TESTING"] = True
-    return app_module.app.test_client()
+
+class FakeSp:
+    def artist(self, artist_id):
+        return {"id": artist_id, "name": "Real Name"}
 
 
 def test_logged_out_home_shows_connect_button(client):
@@ -25,17 +26,36 @@ def test_callback_rejects_bad_state(client):
 
 
 def test_playlist_validates_input(client, monkeypatch):
-    monkeypatch.setattr(app_module, "get_client", lambda: object())
-    assert client.post("/api/playlist", json={"count": 5}).status_code == 400
-    body = {"artist_id": "a", "artist_name": "A"}
-    assert client.post("/api/playlist", json={**body, "count": "abc"}).status_code == 400
-    assert client.post("/api/playlist", json={**body, "count": 0}).status_code == 400
-    assert client.post("/api/playlist", json={**body, "count": 101}).status_code == 400
+    monkeypatch.setattr(app_module, "get_client", lambda: FakeSp())
+    post = lambda body: client.post("/api/playlist", json=body)
+    assert post({"count": 5}).status_code == 400
+    assert post({"artist_id": "not-valid!", "count": 5}).status_code == 400
+    assert post({"artist_id": VALID_ID, "count": "abc"}).status_code == 400
+    assert post({"artist_id": VALID_ID, "count": 0}).status_code == 400
+    assert post({"artist_id": VALID_ID, "count": 101}).status_code == 400
+    assert client.post("/api/playlist", data="not json", content_type="text/plain").status_code == 400
 
 
 def test_playlist_happy_path(client, monkeypatch):
-    monkeypatch.setattr(app_module, "get_client", lambda: object())
+    monkeypatch.setattr(app_module, "get_client", lambda: FakeSp())
     monkeypatch.setattr(app_module.pl, "build_playlist", lambda *a, **k: ["u1", "u2"])
     monkeypatch.setattr(app_module.pl, "create_playlist", lambda *a, **k: "https://open.spotify.com/playlist/x")
-    res = client.post("/api/playlist", json={"artist_id": "a", "artist_name": "A", "count": 5})
+    res = client.post("/api/playlist", json={"artist_id": VALID_ID, "count": 5})
     assert res.get_json() == {"url": "https://open.spotify.com/playlist/x", "added": 2, "requested": 5}
+
+
+def test_client_works_outside_request_context(monkeypatch):
+    """Regression: playlist lookups run in worker threads, which have no Flask session."""
+    from flask import session
+
+    monkeypatch.setenv("SPOTIPY_CLIENT_ID", "id")
+    monkeypatch.setenv("SPOTIPY_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("SPOTIPY_REDIRECT_URI", "http://127.0.0.1:5000/callback")
+    with app_module.app.test_request_context("/"):
+        app_module.token_cache().save_token_to_cache({
+            "access_token": "abc", "refresh_token": "r", "token_type": "Bearer",
+            "expires_in": 3600, "expires_at": int(time.time()) + 3600, "scope": app_module.SCOPE,
+        })
+        sp = app_module.get_client()
+    assert sp is not None
+    assert sp._auth_headers() == {"Authorization": "Bearer abc"}  # no request context here
