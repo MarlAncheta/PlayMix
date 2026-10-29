@@ -113,3 +113,35 @@ def test_create_playlist_uses_2026_endpoints():
     assert calls[0][0] == "me/playlists" and calls[0][1]["public"] is True
     assert [c[0] for c in calls[1:]] == ["playlists/p1/items", "playlists/p1/items"]
     assert [len(c[1]["uris"]) for c in calls[1:]] == [100, 50]  # batched at 100
+
+
+DEFAULT = "Test Artist - Random Hits"
+
+
+@pytest.mark.parametrize("raw, expected", [
+    (None, DEFAULT),
+    ("", DEFAULT),
+    ("   ", DEFAULT),
+    (123, DEFAULT),
+    ("My road trip mix", "My road trip mix"),
+    ("  spaced    out  ", "spaced out"),
+    ("line\nbreak\tand\x00null", "line break and null"),
+    ("x" * 300, "x" * 100),
+])
+def test_clean_playlist_name(raw, expected):
+    assert pl.clean_playlist_name(raw, DEFAULT) == expected
+
+
+def test_create_playlist_uses_custom_name_or_default():
+    sent = []
+
+    class Recorder:
+        def _post(self, url, payload=None):
+            sent.append(payload)
+            return {"id": "p1", "external_urls": {"spotify": "https://x"}}
+
+    pl.create_playlist(Recorder(), "Test Artist", ["u1"], name="Friday vibes")
+    pl.create_playlist(Recorder(), "Test Artist", ["u1"], name="  ")
+    pl.create_playlist(Recorder(), "Test Artist", ["u1"])
+    names = [p["name"] for p in sent if "name" in p]
+    assert names == ["Friday vibes", DEFAULT, DEFAULT]

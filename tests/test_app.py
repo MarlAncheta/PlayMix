@@ -59,3 +59,19 @@ def test_client_works_outside_request_context(monkeypatch):
         sp = app_module.get_client()
     assert sp is not None
     assert sp._auth_headers() == {"Authorization": "Bearer abc"}  # no request context here
+
+
+def test_playlist_name_is_passed_to_creation(client, monkeypatch):
+    seen = {}
+
+    def fake_create(sp, artist_name, uris, public=False, name=None):
+        seen["name"] = name
+        return "https://x"
+
+    monkeypatch.setattr(app_module, "get_client", lambda: FakeSp())
+    monkeypatch.setattr(app_module.pl, "build_playlist", lambda *a, **k: ["u1"])
+    monkeypatch.setattr(app_module.pl, "create_playlist", fake_create)
+    client.post("/api/playlist", json={"artist_id": VALID_ID, "count": 1, "name": "Road trip"})
+    assert seen["name"] == "Road trip"
+    client.post("/api/playlist", json={"artist_id": VALID_ID, "count": 1})
+    assert seen["name"] is None

@@ -49,6 +49,8 @@
   #picked { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-bottom: 3px solid var(--sun); padding-bottom: .4rem; }
   #picked strong { font-size: 1.75rem; letter-spacing: -0.02em; }
   .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .field { margin-top: 1.75rem; }
+  .optional { font-weight: 400; color: var(--muted); }
   .count { margin: 2.25rem 0 1.5rem; }
   .count output { display: block; font-size: clamp(5rem, 24vw, 7.5rem); line-height: .9; font-weight: 800; letter-spacing: -0.05em; color: var(--accent); }
   .count output small { font-size: 1.1rem; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-left: .5rem; }
@@ -85,6 +87,11 @@
     <div id="picked" hidden>
       <strong id="picked-name"></strong>
       <button type="button" class="link-btn" id="change">Change artist</button>
+    </div>
+
+    <div class="field">
+      <label for="name">Playlist name <span class="optional">(optional)</span></label>
+      <input id="name" type="text" maxlength="100" autocomplete="off" placeholder="Pick an artist to see the default name">
     </div>
 
     <div class="count">
@@ -155,6 +162,7 @@
   function pick(a) {
     picked = a;
     $('#picked-name').textContent = a.name;
+    $('#name').placeholder = 'Default: ' + a.name + ' - Random Hits';
     $('#finder').hidden = true; $('#picked').hidden = false;
     results.innerHTML = ''; input.value = ''; make.disabled = false;
   }
@@ -176,7 +184,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          artist_id: picked.id, count: +$('#count').value,
+          artist_id: picked.id, name: $('#name').value, count: +$('#count').value,
           exclude_variants: $('#clean').checked, public: $('#public').checked,
         }),
       });

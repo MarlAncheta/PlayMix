@@ -41,7 +41,7 @@ Open http://127.0.0.1:5000 (use `127.0.0.1`, not `localhost`, so the session coo
 pytest -q
 ```
 
-32 tests mock Spotify and Last.fm, and run on every push through GitHub Actions on Python 3.12 and 3.14.
+42 tests mock Spotify and Last.fm, and run on every push through GitHub Actions on Python 3.12 and 3.14.
 
 ## Deploy
 

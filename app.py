@@ -184,7 +184,9 @@ def api_playlist():
         )
         if not uris:
             return jsonify(error="No tracks found for that artist."), 404
-        url = pl.create_playlist(sp, artist["name"], uris, public=data.get("public") is True)
+        url = pl.create_playlist(
+            sp, artist["name"], uris, public=data.get("public") is True, name=data.get("name")
+        )
     except SpotifyException as e:
         if e.http_status in (400, 404):
             return jsonify(error="That artist could not be found."), 400

@@ -164,12 +164,25 @@ def build_playlist(sp, artist, count, lastfm_key=None, exclude_variants=True,
     return uris
 
 
-def create_playlist(sp, artist_name, uris, public=False):
+MAX_NAME_LENGTH = 100
+CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def clean_playlist_name(raw, default):
+    """User-chosen playlist name, tidied up. Falls back to the default when blank or invalid."""
+    if not isinstance(raw, str):
+        return default
+    name = " ".join(CONTROL_CHARS.sub(" ", raw).split())  # drop control chars, collapse spaces
+    return name[:MAX_NAME_LENGTH].strip() or default
+
+
+def create_playlist(sp, artist_name, uris, public=False, name=None):
+    default_name = f"{artist_name} - Random Hits"
     # Spotify removed POST /users/{id}/playlists in 2026; playlists are now created under /me
     playlist = sp._post(
         "me/playlists",
         payload={
-            "name": f"{artist_name} - Random Hits",
+            "name": clean_playlist_name(name, default_name),
             "public": public,
             "description": f"{len(uris)} randomly picked hits by {artist_name}",
         },
