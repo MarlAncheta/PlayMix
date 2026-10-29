@@ -1,5 +1,5 @@
 flask>=3.0
-spotipy>=2.24
+spotipy>=2.26.0
 requests>=2.31
 python-dotenv>=1.0
 gunicorn>=22.0
