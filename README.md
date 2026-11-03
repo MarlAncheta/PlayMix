@@ -56,3 +56,5 @@ With more than one worker, replace the in-memory cache in `playlist.py` and the 
 ## Limitations
 
 Spotify development mode allows only 5 authorized users per app, and search returns at most 10 results per request.
+
+![PlayMix demo](PlayMix.gif)
