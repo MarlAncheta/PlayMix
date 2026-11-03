@@ -11,6 +11,8 @@ A Flask web app that builds a Spotify playlist from an artist's biggest songs. P
 - **Speed:** track lookups run concurrently in a thread pool, and Last.fm and Spotify lookups are cached in memory with a TTL.
 - **Resilience:** automatic retry with backoff on Spotify rate limits, input validation, readable error messages in the UI, and a `/health` endpoint.
 
+![PlayMix demo](PlayMix.gif)
+
 ## Security
 
 - **Encrypted login tokens:** the Spotify token is encrypted (Fernet) before it is stored in the session cookie, on top of the cookie being signed, `HttpOnly`, `Secure` and `SameSite=Lax` (with the `__Host-` prefix in production).
@@ -57,4 +59,3 @@ With more than one worker, replace the in-memory cache in `playlist.py` and the 
 
 Spotify development mode allows only 5 authorized users per app, and search returns at most 10 results per request.
 
-![PlayMix demo](PlayMix.gif)
